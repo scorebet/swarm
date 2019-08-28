@@ -818,7 +818,7 @@ defmodule Swarm.Tracker do
           # We have received the handoff before we've received the untrack event, but because
           # the handoff is coming from the node where the registration existed, we can safely
           # remove the registration now, and proceed with the handoff
-          Process.demonitor(ref, [:flush])
+          Process.demonitor(ref)
           Registry.remove(obj)
           # Re-enter this callback to take advantage of the first clause
           handle_handoff(from, {name, meta, handoff_state, rclock}, state)
@@ -978,7 +978,7 @@ defmodule Swarm.Tracker do
         cond do
           Clock.leq(lclock, rclock) and node(other_pid) == current_node ->
             # The remote version is dominant, kill the local pid and remove the registration
-            Process.demonitor(ref, [:flush])
+            Process.demonitor(ref)
             Process.exit(other_pid, :kill)
             Registry.remove(obj)
             new_ref = Process.monitor(pid)
@@ -1019,7 +1019,7 @@ defmodule Swarm.Tracker do
           cond do
             Clock.leq(lclock, rclock) ->
               # registration came before unregister, so remove the registration
-              Process.demonitor(ref, [:flush])
+              Process.demonitor(ref)
               Registry.remove(obj)
 
             Clock.leq(rclock, lclock) ->
@@ -1489,7 +1489,7 @@ defmodule Swarm.Tracker do
 
   # Remove a registration, and return the result of the remove
   defp remove_registration(entry(pid: pid, ref: ref, clock: lclock) = obj, state) do
-    Process.demonitor(ref, [:flush])
+    Process.demonitor(ref)
     Registry.remove(obj)
     lclock = Clock.event(lclock)
     broadcast_event(state.nodes, lclock, {:untrack, pid})
