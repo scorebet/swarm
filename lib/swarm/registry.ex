@@ -5,6 +5,7 @@ defmodule Swarm.Registry do
   use GenServer
 
   @table_name :swarm_registry
+  @lookup_table_name :swarm_registry_lookup
 
   ## Public API
 
@@ -114,21 +115,35 @@ defmodule Swarm.Registry do
   Inserts a new registration, and returns true if successful, or false if not
   """
   @spec new(Entry.entry()) :: boolean
-  def new(entry() = reg) do
-    :ets.insert_new(@table_name, reg)
+  def new(entry(pid: pid, ref: ref, name: name) = reg) do
+    case :ets.insert_new(@table_name, reg) do
+      true ->
+        :ets.insert(@lookup_table_name, {pid, name})
+        :ets.insert(@lookup_table_name, {ref, name})
+        true
+
+      false ->
+        false
+    end
   end
 
   @doc """
   Like `new/1`, but raises if the insertion fails.
   """
   @spec new!(Entry.entry()) :: true | no_return
-  def new!(entry() = reg) do
-    true = :ets.insert_new(@table_name, reg)
+  def new!(entry(pid: pid, ref: ref, name: name) = reg) do
+    case :ets.insert_new(@table_name, reg) do
+      true ->
+        :ets.insert(@lookup_table_name, {pid, name})
+        :ets.insert(@lookup_table_name, {ref, name})
+    end
   end
 
   @spec remove(Entry.entry()) :: true
-  def remove(entry() = reg) do
+  def remove(entry(pid: pid, ref: ref, name: name) = reg) do
     :ets.delete_object(@table_name, reg)
+    :ets.delete_object(@lookup_table_name, {pid, name})
+    :ets.delete_object(@lookup_table_name, {ref, name})
   end
 
   @spec remove_by_pid(pid) :: true
@@ -138,7 +153,7 @@ defmodule Swarm.Registry do
         true
 
       entries when is_list(entries) ->
-        Enum.each(entries, &:ets.delete_object(@table_name, &1))
+        Enum.each(entries, &remove/1)
         true
     end
   end
@@ -153,10 +168,11 @@ defmodule Swarm.Registry do
 
   @spec get_by_pid(pid) :: :undefined | [Entry.entry()]
   def get_by_pid(pid) do
-    case :ets.match_object(
-           @table_name,
-           entry(name: :"$1", pid: pid, ref: :"$2", meta: :"$3", clock: :"$4")
-         ) do
+    :ets.lookup(@lookup_table_name, pid)
+    |> Enum.map(fn {_, name} -> name end)
+    |> Enum.uniq()
+    |> Enum.flat_map(fn name -> :ets.lookup(@table_name, name) end)
+    |> case do
       [] -> :undefined
       list when is_list(list) -> list
     end
@@ -175,10 +191,11 @@ defmodule Swarm.Registry do
 
   @spec get_by_ref(reference()) :: :undefined | Entry.entry()
   def get_by_ref(ref) do
-    case :ets.match_object(
-           @table_name,
-           entry(name: :"$1", pid: :"$2", ref: ref, meta: :"$3", clock: :"$4")
-         ) do
+    :ets.lookup(@lookup_table_name, ref)
+    |> Enum.map(fn {_, name} -> name end)
+    |> Enum.uniq()
+    |> Enum.flat_map(fn name -> :ets.lookup(@table_name, name) end)
+    |> case do
       [] -> :undefined
       [obj] -> obj
     end
@@ -235,6 +252,14 @@ defmodule Swarm.Registry do
         read_concurrency: true,
         write_concurrency: true
       ])
+
+    :ets.new(@lookup_table_name, [
+      :bag,
+      :named_table,
+      :public,
+      read_concurrency: true,
+      write_concurrency: true
+    ])
 
     {:ok, t}
   end
