@@ -856,25 +856,27 @@ defmodule Swarm.Tracker do
               debug("#{inspect(pid)} belongs on #{other_node}")
               # This process needs to be moved to the new node
               try do
-                case GenServer.call(pid, {:swarm, :begin_handoff}) do
-                  :ignore ->
-                    debug("#{inspect(name)} has requested to be ignored")
-                    state
+# All of our processes are meant to work with :restart, so skip the GenServer.call
 
-                  {:resume, handoff_state} ->
-                    debug("#{inspect(name)} has requested to be resumed")
-                    {:ok, new_state} = remove_registration(obj, state)
-                    send(pid, {:swarm, :die})
-                    debug("sending handoff for #{inspect(name)} to #{other_node}")
+#                case GenServer.call(pid, {:swarm, :begin_handoff}) do
+#                  :ignore ->
+#                    debug("#{inspect(name)} has requested to be ignored")
+#                    state
+#
+#                  {:resume, handoff_state} ->
+#                    debug("#{inspect(name)} has requested to be resumed")
+#                    {:ok, new_state} = remove_registration(obj, state)
+#                    send(pid, {:swarm, :die})
+#                    debug("sending handoff for #{inspect(name)} to #{other_node}")
+#
+#                    GenStateMachine.cast(
+#                      {__MODULE__, other_node},
+#                      {:handoff, self(), {name, meta, handoff_state, Clock.peek(new_state.clock)}}
+#                    )
+#
+#                    new_state
 
-                    GenStateMachine.cast(
-                      {__MODULE__, other_node},
-                      {:handoff, self(), {name, meta, handoff_state, Clock.peek(new_state.clock)}}
-                    )
-
-                    new_state
-
-                  :restart ->
+#                  :restart ->
                     debug("#{inspect(name)} has requested to be restarted")
                     {:ok, new_state} = remove_registration(obj, state)
                     send(pid, {:swarm, :die})
@@ -883,7 +885,7 @@ defmodule Swarm.Tracker do
                       :keep_state_and_data -> new_state
                       {:keep_state, new_state} -> new_state
                     end
-                end
+#                end
               catch
                 _, err ->
                   warn("handoff failed for #{inspect(name)}: #{inspect(err)}")
