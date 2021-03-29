@@ -1353,7 +1353,7 @@ defmodule Swarm.Tracker do
           )
 
           # register named process that is unknown locally
-          add_registration({name, pid, meta}, from, state)
+          GenStateMachine.call(__MODULE__, {:track, name, pid, meta}, :infinity)
           :ok
 
         {:error, {:noproc, _}} = err ->
