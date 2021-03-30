@@ -1352,9 +1352,10 @@ defmodule Swarm.Tracker do
             "#{inspect(name)} already registered to #{inspect(pid)} on #{node(pid)}, registering locally"
           )
 
-          # register named process that is unknown locally
-          add_registration({name, pid, meta}, from, state)
-          :ok
+          case from do
+            nil -> :ok
+            _   -> GenStateMachine.reply(from, {:ok, pid})
+          end
 
         {:error, {:noproc, _}} = err ->
           warn(
