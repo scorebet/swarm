@@ -1134,6 +1134,10 @@ defmodule Swarm.Tracker do
     add_registration({name, pid, meta}, from, state)
   end
 
+  defp handle_call({:add_registration, name, pid, meta, from}, _from, %TrackerState{} = state) do
+    add_registration({name, pid, meta}, from, state)
+  end
+
   defp handle_call({:track, name, meta}, from, state) do
     current_node = Node.self()
     {{m, f, a}, _other_meta} = Map.pop(meta, :mfa)
@@ -1353,7 +1357,7 @@ defmodule Swarm.Tracker do
           )
 
           # register named process that is unknown locally
-          add_registration({name, pid, meta}, from, state)
+          GenStateMachine.call(__MODULE__, {:add_registration, name, pid, meta, from}, :infinity)
           :ok
 
         {:error, {:noproc, _}} = err ->
